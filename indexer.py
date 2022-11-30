@@ -3,17 +3,25 @@ import json
 import requests
 import base64
 import mysql.connector
+import pickle
 from mysql.connector import pooling
 from multiprocessing.pool import ThreadPool as multihilo
 
 #Definitions
 debug_mode = 2 # 0 = no debug, 1 = no multithread, 2 = no multithread+print things
-i = 25010718 #block start (random)
-#i = 23834665
+direccion = 1 # 1 = FORWARD(index new trades), 0 = BACKWARDS(index historical, stops automatically)
 asa_memoria = {}
 fichapool_memoria = {}
 verificados = []
 lista_pools = []
+
+try:
+	with open("/var/lib/algorand/algod.token", "r") as fichero:
+		algod_token = fichero.read()
+except:
+	algod_token = None
+
+
 algocharts = mysql.connector.pooling.MySQLConnectionPool(pool_name = "algocharts",pool_size = 24,host="localhost",user="pablo",	password="algocharts",database="algocharts")
 
 class conexion(object):
@@ -223,7 +231,7 @@ def asa_datos(asa):
 	'creator': parsear_asa['asset']['params']['creator'],
 	'reserve': parsear_asa['asset']['params']['reserve'] }
 	asa_memoria[0] = {'id': 0, 'name': "Algorand", 'unit_name': "ALGO", 'total_amount': 10000000000000000, 'url': "https://www.algorand.org", 'decimals': 6, 'is_verified': 1,
-	'circulating_supply': 6931148926730000,
+	'circulating_supply': 7115148926730000,
 	'creator': "",
 	'reserve': ""
 	}
@@ -231,9 +239,16 @@ def asa_datos(asa):
 
 
 session = requests.Session()
+lsession = requests.Session()
 #AQUI EMPIEZA/START HERE
 sincronizado = False
 obtener_verificados()
+try:
+	with open("last-block", "r") as fichero:
+		i = int(fichero.read())
+except:
+	i = 25200000
+	pass
 
 while True:
 	if i % 1000 == 0:
@@ -246,7 +261,7 @@ while True:
 	if len(parsear_bloque) < 2:
 		time.sleep(2)
 		sincronizado = True
-		print(f'Block for {i} failed, retrying in 2 sec.')
+		print(f'Still not {i}! ')
 		continue
 	else:
 		bloque_dicc = parsear_bloque['transactions']
@@ -277,4 +292,11 @@ while True:
 
 
 		lista_pools.clear()
-		i = i + 1
+		if direccion == 1:
+			i = i + 1
+		else:
+			i = i - 1
+			if i < 16500000: break #pre-markets block
+
+		with open("last-block", "w") as fichero:
+			fichero.write(str(i))
