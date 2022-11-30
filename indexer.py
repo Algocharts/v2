@@ -3,7 +3,6 @@ import json
 import requests
 import base64
 import mysql.connector
-import pickle
 from mysql.connector import pooling
 from multiprocessing.pool import ThreadPool as multihilo
 
