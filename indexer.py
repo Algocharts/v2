@@ -21,7 +21,7 @@ except:
 	algod_token = None
 
 
-algocharts = mysql.connector.pooling.MySQLConnectionPool(pool_name = "algocharts",pool_size = 24,host="localhost",user="algocharts",password="algocharts",database="algocharts")
+algocharts = mysql.connector.pooling.MySQLConnectionPool(pool_name = "algocharts",pool_size = 24,host="localhost",user="pablo",password="algocharts",database="algocharts")
 
 class conexion(object):
 	def __init__(self):
