@@ -6,41 +6,36 @@ import mysql.connector
 from mysql.connector import pooling
 from multiprocessing.pool import ThreadPool as multihilo
 
-#Opciones
-option_debug = True 			#debug, print whats going on
-option_protocol_debug = True		#debug this design itself
-option_print_current_block = False 	#more debug
-option_multi = False 			#multithread on/off
-option_reverse = False 			#go backwards
+####################
+##Opciones/OPTIONS##
+####################
+opt_debug = True 			#debug, print whats going on
+opt_protocol_debug = True		#debug this design itself
+opt_print_current_block = False 	#more debug
+opt_multi = True 			#multithread on/off
+opt_reverse = False 			#go backwards
+opt_local_node = False			#use local node
 
 
-#Init
-asa_memoria = {}
-fichapool_memoria = {}
-verificados = []
-lista_pools = []
-
-try:
-	with open("/var/lib/algorand/algod.token", "r") as fichero:
-		algod_token = fichero.read()
-except:
-	algod_token = None
-
-
-algocharts = mysql.connector.pooling.MySQLConnectionPool(pool_name = "algocharts",pool_size = 24,host="localhost",user="pablo", password="algocharts",database="algocharts")
-
+#######################
+##Funciones/FUNCTIONS##
+#######################
 class conexion(object):
 	def __init__(self):
 		inicio=""
 
 def pool_datos(pool):
-	datos_pool = session.get(f'https://mainnet-idx.algonode.cloud/v2/accounts/{pool}')
+	if opt_local_node == True:
+		datos_pool = lsession.get(f'http://127.0.0.1:8080/v2/accounts/{pool}')
+	else:
+		datos_pool = session.get(f'https://mainnet-idx.algonode.cloud/v2/accounts/{pool}')
 	parse_pool = json.loads(datos_pool.text)
 	try: fichapool = parse_pool['account']['created-assets'][0]['index']
 	except KeyError: return None
+	if len(parse_pool['account']['assets']) < 2 or len(parse_pool['account']['assets']) > 3: return None
 	if fichapool not in fichapool_memoria: fichapool_memoria[fichapool] = asa_datos(fichapool)
 	if len(parse_pool['account']['assets']) == 2:
-		if parse_pool['account']['assets'][0]['asset-id'] == fichapool: asa_1 = parse_pool['account']['assets'][1]['asset-id'] 
+		if parse_pool['account']['assets'][0]['asset-id'] == fichapool: asa_1 = parse_pool['account']['assets'][1]['asset-id']
 		else: asa_1 = parse_pool['account']['assets'][0]['asset-id']
 		asa_2 = 0
 		if asa_1 not in asa_memoria: asa_memoria[asa_1] = asa_datos(asa_1)
@@ -59,13 +54,17 @@ def pool_datos(pool):
 	return asa_1, asa_2, fichapool
 
 def pool_lookup(pool):
-	url = f"https://mainnet-idx.algonode.cloud/v2/accounts/{pool}/transactions?min-round={i}&max-round={i}"
-	urltx = session.get(url=url, headers={'Connection': 'close'})
+	if opt_local_node == True and opt_reverse == False and sincronizado == True:
+		url = f"http://127.0.0.1:8080/v2/accounts/{pool}/transactions?min-round={i}&max-round={i}"
+		urltx = lsession.get(url=url, headers={'Connection': 'close'})
+	else:
+		url = f"https://mainnet-idx.algonode.cloud/v2/accounts/{pool}/transactions?min-round={i}&max-round={i}"
+		urltx = session.get(url=url, headers={'Connection': 'close'})
 	url_parse = json.loads(urltx.text)
 	return url_parse
 
 def volumen_tm(grupo, txs, pool, asa1): #volumen TINYMAN1.1
-	if option_debug == True: print("TX POOL: " + pool + " TX GROUP " + grupo)
+	if opt_debug == True: print("TX POOL: " + pool + " TX GROUP " + grupo)
 	tvol1 = 0; tvol2 = 0; feetx = False #just because some swaps are 2000 malgo
 	for transacciones in txs:
 		if transacciones['group'] == grupo:
@@ -82,21 +81,21 @@ def volumen_tm(grupo, txs, pool, asa1): #volumen TINYMAN1.1
 					if transacciones['asset-transfer-transaction']['asset-id'] == asa1:
 						vol1 = transacciones['asset-transfer-transaction']['amount']
 					else: vol2 = transacciones['asset-transfer-transaction']['amount']
-	if option_protocol_debug == False: 
+	if opt_protocol_debug == False:
 		if 'vol1' and 'vol2' not in locals():
 			return None
 	tvol1 = tvol1 + vol1; tvol2 = tvol2 + vol2
-	if option_debug == True: print("volume1: " + str(tvol1) + " volume2: " + str(tvol2))
+	if opt_debug == True: print("volume1: " + str(tvol1) + " volume2: " + str(tvol2))
 	return tvol1, tvol2
 
 
 def volumen_af_pf(grupo, txs, pool, asa1): #volumen PACTFI y ALGOFI y HUMBLE
-	if option_debug == True: print("TX POOL: " + pool + " TX GROUP " + grupo)
+	if opt_debug == True: print("TX POOL: " + pool + " TX GROUP " + grupo)
 	tvol1 = 0; tvol2 = 0
 	for transacciones in txs:
 		if transacciones['group'] == grupo:
 			if 'payment-transaction' in transacciones.keys():
-				if transacciones['payment-transaction']['amount'] > 2000: 
+				if transacciones['payment-transaction']['amount'] > 2000:
 					vol2 = transacciones['payment-transaction']['amount']
 
 			if 'asset-transfer-transaction' in transacciones.keys():
@@ -111,11 +110,11 @@ def volumen_af_pf(grupo, txs, pool, asa1): #volumen PACTFI y ALGOFI y HUMBLE
 					if transacciones['inner-txns'][0]['asset-transfer-transaction']['asset-id'] == asa1:
 						vol1 = transacciones['inner-txns'][0]['asset-transfer-transaction']['amount']
 					else: vol2 = transacciones['inner-txns'][0]['asset-transfer-transaction']['amount']
-	if option_protocol_debug == False: 
+	if opt_protocol_debug == False:
 		if 'vol1' and 'vol2' not in locals():
 			return None
 	tvol1 = tvol1 + vol1; tvol2 = tvol2 + vol2
-	if option_debug == True: print("volume1: " + str(tvol1) + " volume2: " + str(tvol2))
+	if opt_debug == True: print("volume1: " + str(tvol1) + " volume2: " + str(tvol2))
 	return tvol1, tvol2
 
 
@@ -128,7 +127,7 @@ def precio(pool):
 	for transacciones in url_parse['transactions']:
 		if transacciones['tx-type'] == 'appl':
 				if 'c3dhcA==' in transacciones['application-transaction']['application-args']:
-					if option_debug == True: print("TINYMAN TX " + str(asas))
+					if opt_debug == True: print("TINYMAN TX " + str(asas))
 					volumen = volumen_tm(transacciones['group'], url_parse['transactions'], pool, asas[0])
 					mercado = "1"; contador = contador + 1
 					for x in transacciones['local-state-delta']:
@@ -137,7 +136,7 @@ def precio(pool):
 							if w['key'] == "czI=": liq2 = w['value']['uint']
 				elif 'c2Vm' in transacciones['application-transaction']['application-args'] and len(transacciones['application-transaction']['foreign-apps']) == 0:
 				#https://docs.algofi.org/algofi-nanoswap/mainnet-contracts
-					if option_debug == True: print("ALGOFI TX " + str(asas))
+					if opt_debug == True: print("ALGOFI TX " + str(asas))
 					volumen = volumen_af_pf(transacciones['group'], url_parse['transactions'], pool, asas[0])
 					mercado = "2"
 					contador = contador + 1
@@ -145,7 +144,7 @@ def precio(pool):
 						if x['key'] == "YjI=": liq1 =  x['value']['uint']
 						if x['key'] == "YjE=": liq2 = x['value']['uint']
 				elif 'U1dBUA==' in transacciones['application-transaction']['application-args']:
-					if option_debug == True: print("PACTFI TX " + str(asas))
+					if opt_debug == True: print("PACTFI TX " + str(asas))
 					volumen = volumen_af_pf(transacciones['group'], url_parse['transactions'], pool, asas[0])
 					mercado = "3"
 					contador = contador + 1
@@ -153,7 +152,7 @@ def precio(pool):
 						if x['key'] == "Qg==": liq1 =  x['value']['uint']
 						if x['key'] == "QQ==": liq2 = x['value']['uint']
 				elif all(item in transacciones['application-transaction']['application-args'] for item in ['AA==', 'Aw==', 'AAAAAAAAAAA=']):
-					if option_debug == True: print("HUMBLE TX " + str(asas))
+					if opt_debug == True: print("HUMBLE TX " + str(asas))
 					if int.from_bytes(base64.b64decode(transacciones['application-transaction']['application-args'][3])[:1], 'big') != 4: return #4 trade, 2 liquidity ?
 					volumen = volumen_af_pf(transacciones['group'], url_parse['transactions'], pool, asas[0])
 					mercado = "4"
@@ -171,7 +170,10 @@ def precio(pool):
 	sql = f"INSERT IGNORE INTO {tabla} (timestamp, liqa1, liqa2, precio, vol1, vol2, tx, market) VALUES ( FROM_UNIXTIME( {int(transacciones['round-time'])} ), {liq1}, {liq2}, {(liq2/liq1)*ajuste_decimales(asas[0],asas[1])}, {volumen[0]}, {volumen[1]}, {contador}, {mercado} )"
 	cursor.execute(sql)
 	conexion.commit()
-	sql = "INSERT INTO pools (asa1, asa2, pool, market, lptoken, liqa1, liqa2) VALUES ( %s, %s, %s, %s, %s, %s, %s ) ON DUPLICATE KEY UPDATE liqa1 = %s, liqa2 = %s"
+	if opt_reverse == False:
+		sql = "INSERT INTO pools (asa1, asa2, pool, market, lptoken, liqa1, liqa2) VALUES ( %s, %s, %s, %s, %s, %s, %s ) ON DUPLICATE KEY UPDATE liqa1 = %s, liqa2 = %s"
+	else:
+		sql = "INSERT IGNORE INTO pools (asa1, asa2, pool, market, lptoken, liqa1, liqa2) VALUES ( %s, %s, %s, %s, %s, %s, %s )"
 	valores = ( int(asas[0]), int(asas[1]), pool, mercado, int(asas[2]), liq1, liq2, liq1, liq2)
 	cursor.execute(sql, valores)
 	conexion.commit()
@@ -196,12 +198,17 @@ def verificado(asa):
 		return "1"
 
 def obtener_circulating(reserve, asa, total):
-	if option_debug == True:
+	if opt_debug == True:
 		print("Obtener circulating: reserve address: " + reserve + " asa: " + str(asa))
-	obtener_circulating = session.get(f'https://mainnet-idx.algonode.cloud/v2/accounts/{reserve}/assets')
-	parsear_circulating = json.loads(obtener_circulating.text)
+	if opt_local_node == True:
+		obtener_circulating = lsession.get(f'http://127.0.0.1:8080/v2/accounts/{reserve}')
+		parsear_circulating = json.loads(obtener_circulating.text); y = parsear_circulating['account']['assets']
+	else:
+		obtener_circulating = session.get(f'https://mainnet-idx.algonode.cloud/v2/accounts/{reserve}/assets')
+		parsear_circulating = json.loads(obtener_circulating.text); y = parsear_circulating['assets']
+
 	try:
-		for x in parsear_circulating['assets']:
+		for x in y:
 			if x['asset-id'] == asa:
 				reservas = x['asset-id']
 				break
@@ -210,7 +217,10 @@ def obtener_circulating(reserve, asa, total):
 		return total
 
 def asa_datos(asa):
-	obtener_asa = session.get(f'https://mainnet-idx.algonode.cloud/v2/assets/{asa}')
+	if opt_local_node == True:
+		obtener_asa = session.get(f'http://127.0.0.1:8080/v2/assets/{asa}')
+	else:
+		obtener_asa = session.get(f'https://mainnet-idx.algonode.cloud/v2/assets/{asa}')
 	parsear_asa = json.loads(obtener_asa.text)
 	if parsear_asa['asset']['params']['reserve'] == "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAY5HFKQ":
 		circulating = parsear_asa['asset']['params']['total']
@@ -247,34 +257,69 @@ def asa_datos(asa):
 	}
 	return diccionario_asa
 
+#######################################
+##Comienzo del programa/PROGRAM START##
+#######################################
+sincronizado = False
+asa_memoria = {}
+fichapool_memoria = {}
+verificados = []
+lista_pools = []
+
+
+try:
+	with open("/var/lib/algorand/algod.token", "r") as f:
+		algod_token = f.read()
+except:
+	algod_token = None
+
+algocharts = mysql.connector.pooling.MySQLConnectionPool(pool_name = "algocharts",pool_size = 24,host="localhost",user="pablo", password="algocharts",database="algocharts")
 
 session = requests.Session()
 lsession = requests.Session()
-#AQUI EMPIEZA/START HERE
-sincronizado = False
+
+lsession.headers.update({'X-Algo-API-Token':algod_token})
+
 obtener_verificados()
+
+if opt_reverse == False: fichero = "last-block"
+else: fichero = "last-block-reverse"
+
+if opt_local_node == True:
+	obtener_cblock = lsession.get('http://127.0.0.1:8080/v2/status/')
+else:
+	obtener_cblock = session.get('https://node.algoexplorerapi.io/v2/status')
+parsear_cblock = json.loads(obtener_cblock.text); last_round = parsear_cblock['last-round']
+
 try:
-	with open("last-block", "r") as fichero:
-		i = int(fichero.read())
+	with open(fichero, "r") as f:
+		i = int(f.read())
+
 except:
-	i = 25000000 # manual block start!! 
+	i = 25000000 # manual block start!!
 	pass
+
+if last_round - i < 600:
+	sincronizado == True
+
 
 while True:
 	if i % 1000 == 0:
 		asa_memoria.clear()
 		if sincronizado == True: obtener_verificados()
 
-
-	obtener_bloque = session.get(f'https://mainnet-idx.algonode.cloud/v2/blocks/{i}')
+	if opt_local_node == True and opt_reverse == False and sincronizado == True:
+		obtener_bloque = lsession.get(f'http://127.0.0.1:8080/v2/blocks/{i}')
+	else:
+		obtener_bloque = session.get(f'https://mainnet-idx.algonode.cloud/v2/blocks/{i}')
 	parsear_bloque = json.loads(obtener_bloque.text)
 	if len(parsear_bloque) < 2:
 		time.sleep(2)
 		sincronizado = True
-		if option_print_current_block == True: print(f'Still not {i}! ')
+		if opt_print_current_block == True: print(f'Still not {i}! ')
 		continue
 	else:
-		if option_print_current_block == True: print(i)
+		if opt_print_current_block == True: print(i)
 		bloque_dicc = parsear_bloque['transactions']
 		for x in bloque_dicc:
 			if x['tx-type'] == 'appl':
@@ -289,25 +334,25 @@ while True:
 						if len(x['application-transaction']['application-args'][3]) > 24:
 							lista_pools.append(x['inner-txns'][0]['sender'])
 				except Exception as e:
-					if option_debug == True: print(e)
+					if opt_debug == True: print(e)
 
 
 		paralelo = multihilo(16)
 		for y in lista_pools:
-			if option_multi == True: paralelo.apply_async(precio, (y,))
+			if opt_multi == True: paralelo.apply_async(precio, (y,))
 			else: precio(y)
 
-		if option_multi == True:
+		if opt_multi == True:
 			paralelo.close()
 			paralelo.join()
 
 
 		lista_pools.clear()
-		if option_reverse == False:
+		if opt_reverse == False:
 			i = i + 1
 		else:
 			i = i - 1
 			if i < 16500000: break #pre-markets block
 
-		with open("last-block", "w") as fichero:
-			fichero.write(str(i))
+		with open(fichero, "w") as f:
+			f.write(str(i))
