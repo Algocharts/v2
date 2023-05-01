@@ -99,34 +99,70 @@ def volumen_af_pf(grupo, txs, pool, asa1): #volumen PACTFI y ALGOFI y HUMBLE
 	if opt_debug == True: print("TX POOL: " + pool + " TX GROUP " + grupo)
 	tvol1 = 0; tvol2 = 0
 	for transacciones in txs:
-		if transacciones['group'] == grupo:
-			if 'payment-transaction' in transacciones.keys():
-				if transacciones['payment-transaction']['amount'] > 2000:
-					vol2 = transacciones['payment-transaction']['amount']
+		if 'group' in transacciones.keys():
+			if transacciones['group'] == grupo:
+				if 'payment-transaction' in transacciones.keys():
+					if transacciones['payment-transaction']['amount'] > 2000:
+						vol2 = transacciones['payment-transaction']['amount']
 
-			if 'asset-transfer-transaction' in transacciones.keys():
-				if transacciones['asset-transfer-transaction']['asset-id'] == asa1:
-					vol1 = transacciones['asset-transfer-transaction']['amount']
-				else: vol2 = transacciones['asset-transfer-transaction']['amount']
+				if 'asset-transfer-transaction' in transacciones.keys():
+					if transacciones['asset-transfer-transaction']['asset-id'] == asa1:
+						vol1 = transacciones['asset-transfer-transaction']['amount']
+					else: vol2 = transacciones['asset-transfer-transaction']['amount']
 
-			try:
-				pos_array = 0
-				if 'inner-txns' in transacciones.keys():
-					if 'payment-transaction' in transacciones['inner-txns'][pos_array]:
-						vol2 = transacciones['inner-txns'][pos_array]['payment-transaction']['amount']
-					elif 'asset-transfer-transaction' in transacciones['inner-txns'][pos_array]:
-						if transacciones['inner-txns'][pos_array]['asset-transfer-transaction']['asset-id'] == asa1:
-							vol1 = transacciones['inner-txns'][pos_array]['asset-transfer-transaction']['amount']
-						else: vol2 = transacciones['inner-txns'][pos_array]['asset-transfer-transaction']['amount']
-			except IndexError:
-				pos_array = 4
-				if 'inner-txns' in transacciones.keys():
-					if 'payment-transaction' in transacciones['inner-txns'][pos_array]:
-						vol2 = transacciones['inner-txns'][pos_array]['payment-transaction']['amount']
-					elif 'asset-transfer-transaction' in transacciones['inner-txns'][pos_array]:
-						if transacciones['inner-txns'][pos_array]['asset-transfer-transaction']['asset-id'] == asa1:
-							vol1 = transacciones['inner-txns'][pos_array]['asset-transfer-transaction']['amount']
-						else: vol2 = transacciones['inner-txns'][pos_array]['asset-transfer-transaction']['amount']
+				try:
+					pos_array = 0
+					if 'inner-txns' in transacciones.keys():
+						if 'payment-transaction' in transacciones['inner-txns'][pos_array]:
+							vol2 = transacciones['inner-txns'][pos_array]['payment-transaction']['amount']
+						elif 'asset-transfer-transaction' in transacciones['inner-txns'][pos_array]:
+							if transacciones['inner-txns'][pos_array]['asset-transfer-transaction']['asset-id'] == asa1:
+								vol1 = transacciones['inner-txns'][pos_array]['asset-transfer-transaction']['amount']
+							else: vol2 = transacciones['inner-txns'][pos_array]['asset-transfer-transaction']['amount']
+				except IndexError:
+					pos_array = 4
+					if 'inner-txns' in transacciones.keys():
+						if 'payment-transaction' in transacciones['inner-txns'][pos_array]:
+							vol2 = transacciones['inner-txns'][pos_array]['payment-transaction']['amount']
+						elif 'asset-transfer-transaction' in transacciones['inner-txns'][pos_array]:
+							if transacciones['inner-txns'][pos_array]['asset-transfer-transaction']['asset-id'] == asa1:
+								vol1 = transacciones['inner-txns'][pos_array]['asset-transfer-transaction']['amount']
+							else: vol2 = transacciones['inner-txns'][pos_array]['asset-transfer-transaction']['amount']
+
+		else:
+			txs_inner = transacciones['inner-txns']
+			for transacciones_int in txs_inner:
+				if 'group' in transacciones_int.keys():
+					if 'payment-transaction' in transacciones.keys():
+						if transacciones['payment-transaction']['amount'] > 2000:
+							vol2 = transacciones['payment-transaction']['amount']
+
+					if 'asset-transfer-transaction' in transacciones.keys():
+						if transacciones['asset-transfer-transaction']['asset-id'] == asa1:
+							vol1 = transacciones['asset-transfer-transaction']['amount']
+						else: vol2 = transacciones['asset-transfer-transaction']['amount']
+
+					try:
+						pos_array = 0
+						if 'inner-txns' in transacciones.keys():
+							if 'payment-transaction' in transacciones['inner-txns'][pos_array]:
+								vol2 = transacciones['inner-txns'][pos_array]['payment-transaction']['amount']
+							elif 'asset-transfer-transaction' in transacciones['inner-txns'][pos_array]:
+								if transacciones['inner-txns'][pos_array]['asset-transfer-transaction']['asset-id'] == asa1:
+									vol1 = transacciones['inner-txns'][pos_array]['asset-transfer-transaction']['amount']
+								else: vol2 = transacciones['inner-txns'][pos_array]['asset-transfer-transaction']['amount']
+					except IndexError:
+						pos_array = 4
+						if 'inner-txns' in transacciones.keys():
+							if 'payment-transaction' in transacciones['inner-txns'][pos_array]:
+								vol2 = transacciones['inner-txns'][pos_array]['payment-transaction']['amount']
+							elif 'asset-transfer-transaction' in transacciones['inner-txns'][pos_array]:
+								if transacciones['inner-txns'][pos_array]['asset-transfer-transaction']['asset-id'] == asa1:
+									vol1 = transacciones['inner-txns'][pos_array]['asset-transfer-transaction']['amount']
+								else: vol2 = transacciones['inner-txns'][pos_array]['asset-transfer-transaction']['amount']
+
+
+
 	if opt_protocol_debug == False:
 		if 'vol1' and 'vol2' not in locals():
 			return None
