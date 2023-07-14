@@ -10,9 +10,9 @@ from multiprocessing.pool import ThreadPool as multihilo
 ##Opciones/OPTIONS##
 ####################
 opt_debug = True 			#debug, print whats going on
-opt_protocol_debug = False		#debug this design itself
+opt_protocol_debug = True		#debug this design itself
 opt_print_current_block = True	 	#more debug
-opt_multi = False 			#multithread on/off
+opt_multi = True 			#multithread on/off
 opt_reverse = False 			#go backwards
 opt_local_node = False			#use local node
 
@@ -30,15 +30,8 @@ def pool_datos(pool):
 	else:
 		datos_pool = session.get(f'https://mainnet-idx.algonode.cloud/v2/accounts/{pool}')
 	parse_pool = json.loads(datos_pool.text)
-	try:
-		fichapool = parse_pool['account']['created-assets'][0]['index']
-	except KeyError:
-		try:
-			for z in parse_pool['account']['apps-local-state'][0]['key-value']:
-				if z['key'] == "cG9vbF90b2tlbl9hc3NldF9pZA==": #tinyman2 hack
-					fichapool =  z['value']['uint']
-		except KeyError:
-			return None
+	try: fichapool = parse_pool['account']['created-assets'][0]['index']
+	except KeyError: return None
 	if len(parse_pool['account']['assets']) < 2 or len(parse_pool['account']['assets']) > 3: return None
 	if fichapool not in fichapool_memoria: fichapool_memoria[fichapool] = asa_datos(fichapool)
 	if len(parse_pool['account']['assets']) == 2:
@@ -70,7 +63,7 @@ def pool_lookup(pool):
 	url_parse = json.loads(urltx.text)
 	return url_parse
 
-def volumen_tm(grupo, txs, pool, asa1): #volumen TINYMAN 1 y 1.1
+def volumen_tm(grupo, txs, pool, asa1): #volumen TINYMAN1.1
 	if opt_debug == True: print("TX POOL: " + pool + " TX GROUP " + grupo)
 	tvol1 = 0; tvol2 = 0; feetx = False #just because some swaps are 2000 malgo
 	for transacciones in txs:
@@ -95,119 +88,28 @@ def volumen_tm(grupo, txs, pool, asa1): #volumen TINYMAN 1 y 1.1
 	if opt_debug == True: print("volume1: " + str(tvol1) + " volume2: " + str(tvol2))
 	return tvol1, tvol2
 
+
 def volumen_af_pf(grupo, txs, pool, asa1): #volumen PACTFI y ALGOFI y HUMBLE
 	if opt_debug == True: print("TX POOL: " + pool + " TX GROUP " + grupo)
 	tvol1 = 0; tvol2 = 0
 	for transacciones in txs:
-		if 'group' in transacciones.keys():
-			if transacciones['group'] == grupo:
-				if 'payment-transaction' in transacciones.keys():
-					if transacciones['payment-transaction']['amount'] > 2000:
-						vol2 = transacciones['payment-transaction']['amount']
+		if transacciones['group'] == grupo:
+			if 'payment-transaction' in transacciones.keys():
+				if transacciones['payment-transaction']['amount'] > 2000:
+					vol2 = transacciones['payment-transaction']['amount']
 
-				if 'asset-transfer-transaction' in transacciones.keys():
+			if 'asset-transfer-transaction' in transacciones.keys():
 					if transacciones['asset-transfer-transaction']['asset-id'] == asa1:
 						vol1 = transacciones['asset-transfer-transaction']['amount']
 					else: vol2 = transacciones['asset-transfer-transaction']['amount']
 
-				try:
-					pos_array = 0
-					if 'inner-txns' in transacciones.keys():
-						if 'payment-transaction' in transacciones['inner-txns'][pos_array]:
-							vol2 = transacciones['inner-txns'][pos_array]['payment-transaction']['amount']
-						elif 'asset-transfer-transaction' in transacciones['inner-txns'][pos_array]:
-							if transacciones['inner-txns'][pos_array]['asset-transfer-transaction']['asset-id'] == asa1:
-								vol1 = transacciones['inner-txns'][pos_array]['asset-transfer-transaction']['amount']
-							else: vol2 = transacciones['inner-txns'][pos_array]['asset-transfer-transaction']['amount']
-				except IndexError:
-					pos_array = 4
-					if 'inner-txns' in transacciones.keys():
-						if 'payment-transaction' in transacciones['inner-txns'][pos_array]:
-							vol2 = transacciones['inner-txns'][pos_array]['payment-transaction']['amount']
-						elif 'asset-transfer-transaction' in transacciones['inner-txns'][pos_array]:
-							if transacciones['inner-txns'][pos_array]['asset-transfer-transaction']['asset-id'] == asa1:
-								vol1 = transacciones['inner-txns'][pos_array]['asset-transfer-transaction']['amount']
-							else: vol2 = transacciones['inner-txns'][pos_array]['asset-transfer-transaction']['amount']
-
-		else:
-			txs_inner = transacciones['inner-txns']
-			for transacciones_int in txs_inner:
-				if 'group' in transacciones_int.keys():
-					if 'payment-transaction' in transacciones.keys():
-						if transacciones['payment-transaction']['amount'] > 2000:
-							vol2 = transacciones['payment-transaction']['amount']
-
-					if 'asset-transfer-transaction' in transacciones.keys():
-						if transacciones['asset-transfer-transaction']['asset-id'] == asa1:
-							vol1 = transacciones['asset-transfer-transaction']['amount']
-						else: vol2 = transacciones['asset-transfer-transaction']['amount']
-
-					try:
-						pos_array = 0
-						if 'inner-txns' in transacciones.keys():
-							if 'payment-transaction' in transacciones['inner-txns'][pos_array]:
-								vol2 = transacciones['inner-txns'][pos_array]['payment-transaction']['amount']
-							elif 'asset-transfer-transaction' in transacciones['inner-txns'][pos_array]:
-								if transacciones['inner-txns'][pos_array]['asset-transfer-transaction']['asset-id'] == asa1:
-									vol1 = transacciones['inner-txns'][pos_array]['asset-transfer-transaction']['amount']
-								else: vol2 = transacciones['inner-txns'][pos_array]['asset-transfer-transaction']['amount']
-					except IndexError:
-						pos_array = 4
-						if 'inner-txns' in transacciones.keys():
-							if 'payment-transaction' in transacciones['inner-txns'][pos_array]:
-								vol2 = transacciones['inner-txns'][pos_array]['payment-transaction']['amount']
-							elif 'asset-transfer-transaction' in transacciones['inner-txns'][pos_array]:
-								if transacciones['inner-txns'][pos_array]['asset-transfer-transaction']['asset-id'] == asa1:
-									vol1 = transacciones['inner-txns'][pos_array]['asset-transfer-transaction']['amount']
-								else: vol2 = transacciones['inner-txns'][pos_array]['asset-transfer-transaction']['amount']
-
-
-
-	if opt_protocol_debug == False:
-		if 'vol1' and 'vol2' not in locals():
-			return None
-	tvol1 = tvol1 + vol1; tvol2 = tvol2 + vol2
-	if opt_debug == True: print("volume1: " + str(tvol1) + " volume2: " + str(tvol2))
-	return tvol1, tvol2
-
-def volumen_tm2(grupo, txs, pool, asa1): #volumen TM2
-	if opt_debug == True: print("TX POOL: " + pool + " TX GROUP " + grupo)
-	tvol1 = 0; tvol2 = 0
-	for transacciones in txs:
-		if 'group' in transacciones.keys():
-			if transacciones['group'] == grupo:
-				if 'payment-transaction' in transacciones.keys():
-					if transacciones['payment-transaction']['amount'] > 2000:
-						vol2 = transacciones['payment-transaction']['amount']
-
-				if 'asset-transfer-transaction' in transacciones.keys():
-						if transacciones['asset-transfer-transaction']['asset-id'] == asa1:
-							vol1 = transacciones['asset-transfer-transaction']['amount']
-						else: vol2 = transacciones['asset-transfer-transaction']['amount']
-
-				if 'inner-txns' in transacciones.keys():
-						for tx in transacciones['inner-txns']:
-							if 'payment-transaction' in tx:
-								vol2 = tx['payment-transaction']['amount']
-							elif 'asset-transfer-transaction' in tx:
-								if tx['asset-transfer-transaction']['asset-id'] == asa1:
-									vol1 = tx['asset-transfer-transaction']['amount']
-								else: vol2 = tx['asset-transfer-transaction']['amount']
-		else:
-			txs_inner = transacciones['inner-txns']
-			for transacciones_int in txs_inner:
-				if 'group' in transacciones_int.keys():
-					if transacciones_int['group'] == grupo:
-						if 'payment-transaction' in transacciones_int.keys():
-							if transacciones_int['payment-transaction']['amount'] > 2000:
-								vol2 = transacciones_int['payment-transaction']['amount']
-
-						if 'asset-transfer-transaction' in transacciones_int.keys():
-								if transacciones_int['asset-transfer-transaction']['asset-id'] == asa1:
-									vol1 = transacciones_int['asset-transfer-transaction']['amount']
-								else: vol2 = transacciones_int['asset-transfer-transaction']['amount']
-
-
+			if 'inner-txns' in transacciones.keys():
+				if 'payment-transaction' in transacciones['inner-txns'][0]:
+					vol2 = transacciones['inner-txns'][0]['payment-transaction']['amount']
+				elif 'asset-transfer-transaction' in transacciones['inner-txns'][0]:
+					if transacciones['inner-txns'][0]['asset-transfer-transaction']['asset-id'] == asa1:
+						vol1 = transacciones['inner-txns'][0]['asset-transfer-transaction']['amount']
+					else: vol2 = transacciones['inner-txns'][0]['asset-transfer-transaction']['amount']
 	if opt_protocol_debug == False:
 		if 'vol1' and 'vol2' not in locals():
 			return None
@@ -216,56 +118,35 @@ def volumen_tm2(grupo, txs, pool, asa1): #volumen TM2
 	return tvol1, tvol2
 
 
-
-#mercados(markets): 1 = tinyman1.0/tinyman1.1, 2 = algofi, 3 = pactfi, 4 = humble2, 5 = tinyman2
+#mercados(markets): 1 = tinyman11, 2 = algofi, 3 = pactfi, 4 = humble2
 def precio(pool):
 	contador = 0
 	asas = pool_datos(pool)
 	if asas == None: return
-	nanoswap = False
 	url_parse = pool_lookup(pool)
 	for transacciones in url_parse['transactions']:
 		if transacciones['tx-type'] == 'appl':
 				if 'c3dhcA==' in transacciones['application-transaction']['application-args']:
-					if transacciones['application-transaction']['application-id'] == 1002541853:
-						if opt_debug == True: print("TINYMAN 2 TX " + str(asas))
-						volumen = volumen_tm2(transacciones['group'], url_parse['transactions'], pool, asas[0])
-						mercado = 5; contador = contador + 1
-						for x in transacciones['local-state-delta']:
-							for w in x['delta']:
-								if w['key'] == "YXNzZXRfMV9yZXNlcnZlcw==": liq1 = w['value']['uint']
-								if w['key'] == "YXNzZXRfMl9yZXNlcnZlcw==": liq2 = w['value']['uint']
-					elif transacciones['application-transaction']['application-id'] == 552635992 or transacciones['application-transaction']['application-id'] == 350338509:
-						if opt_debug == True: print("TINYMAN 1 TX " + str(asas))
-						volumen = volumen_tm(transacciones['group'], url_parse['transactions'], pool, asas[0])
-						mercado = 1; contador = contador + 1
-						for x in transacciones['local-state-delta']:
-							for w in x['delta']:
-								if w['key'] == "czE=": liq1 = w['value']['uint']
-								if w['key'] == "czI=": liq2 = w['value']['uint']
-				elif 'c2Vm' in transacciones['application-transaction']['application-args']: 
-					if transacciones['application-transaction']['foreign-apps'] != 658336870: #https://docs.algofi.org/algofi-nanoswap/mainnet-contracts
-						if opt_debug == True: print("ALGOFI TX " + str(asas))
-						volumen = volumen_af_pf(transacciones['group'], url_parse['transactions'], pool, asas[0])
-						mercado = 2
-						contador = contador + 1
-						for x in transacciones['global-state-delta']:
-							if x['key'] == "YjI=": liq1 =  x['value']['uint']
-							if x['key'] == "YjE=": liq2 = x['value']['uint']
-					elif transacciones['application-transaction']['foreign-apps'] == 658336870:
-						nanoswap = True
-						if opt_debug == True: print("ALGOFI  NANOSWAP TX " + str(asas))
-						volumen = volumen_af_pf(transacciones['group'], url_parse['transactions'], pool, asas[0])
-						mercado = 2
-						contador = contador + 1
-						for x in transacciones['global-state-delta']:
-							if x['key'] == "YjI=": liq1 =  x['value']['uint']
-							if x['key'] == "YjE=": liq2 = x['value']['uint']
-
+					if opt_debug == True: print("TINYMAN TX " + str(asas))
+					volumen = volumen_tm(transacciones['group'], url_parse['transactions'], pool, asas[0])
+					mercado = "1"; contador = contador + 1
+					for x in transacciones['local-state-delta']:
+						for w in x['delta']:
+							if w['key'] == "czE=": liq1 = w['value']['uint']
+							if w['key'] == "czI=": liq2 = w['value']['uint']
+				elif 'c2Vm' in transacciones['application-transaction']['application-args'] and len(transacciones['application-transaction']['foreign-apps']) == 0:
+				#https://docs.algofi.org/algofi-nanoswap/mainnet-contracts
+					if opt_debug == True: print("ALGOFI TX " + str(asas))
+					volumen = volumen_af_pf(transacciones['group'], url_parse['transactions'], pool, asas[0])
+					mercado = "2"
+					contador = contador + 1
+					for x in transacciones['global-state-delta']:
+						if x['key'] == "YjI=": liq1 =  x['value']['uint']
+						if x['key'] == "YjE=": liq2 = x['value']['uint']
 				elif 'U1dBUA==' in transacciones['application-transaction']['application-args']:
 					if opt_debug == True: print("PACTFI TX " + str(asas))
 					volumen = volumen_af_pf(transacciones['group'], url_parse['transactions'], pool, asas[0])
-					mercado = 3
+					mercado = "3"
 					contador = contador + 1
 					for x in transacciones['global-state-delta']:
 						if x['key'] == "Qg==": liq1 =  x['value']['uint']
@@ -274,24 +155,21 @@ def precio(pool):
 					if opt_debug == True: print("HUMBLE TX " + str(asas))
 					if int.from_bytes(base64.b64decode(transacciones['application-transaction']['application-args'][3])[:1], 'big') != 4: return #4 trade, 2 liquidity ?
 					volumen = volumen_af_pf(transacciones['group'], url_parse['transactions'], pool, asas[0])
-					mercado = 4
+					mercado = "4"
 					contador = contador + 1
 					liq2 = int.from_bytes(base64.b64decode(transacciones['global-state-delta'][1]['value']['bytes'])[-38:-30], 'big')
 					liq1 = int.from_bytes(base64.b64decode(transacciones['global-state-delta'][1]['value']['bytes'])[-30:-22], 'big')
 
 	if 'liq1' and 'liq2' not in locals(): return
-	if nanoswap == True and mercado == 3: 
-		mercado = 2
-		if opt_debug == True: print("ALGOFI NANOSWAP(R) TX " + str(asas))
 	tabla = (str(asas[0]) + "_" + str(asas[1]))
 	conexion = algocharts.get_connection()
 	cursor = conexion.cursor()
 	sql = "CREATE TABLE IF NOT EXISTS %s (timestamp TIMESTAMP PRIMARY KEY, liqa1 bigint unsigned NOT NULL, liqa2 bigint unsigned NOT NULL, precio DECIMAL(24,12) NOT NULL, vol1 bigint unsigned not null, vol2 bigint unsigned not null, tx int, market tinyint unsigned not null)" % tabla
 	cursor.execute(sql)
-	#conexion.commit()
+	conexion.commit()
 	sql = f"INSERT IGNORE INTO {tabla} (timestamp, liqa1, liqa2, precio, vol1, vol2, tx, market) VALUES ( FROM_UNIXTIME( {int(transacciones['round-time'])} ), {liq1}, {liq2}, {(liq2/liq1)*ajuste_decimales(asas[0],asas[1])}, {volumen[0]}, {volumen[1]}, {contador}, {mercado} )"
 	cursor.execute(sql)
-	#conexion.commit()
+	conexion.commit()
 	if opt_reverse == False:
 		sql = "INSERT INTO pools (asa1, asa2, pool, market, lptoken, liqa1, liqa2) VALUES ( %s, %s, %s, %s, %s, %s, %s ) ON DUPLICATE KEY UPDATE liqa1 = %s, liqa2 = %s"
 	else:
@@ -330,7 +208,6 @@ def obtener_circulating(reserve, asa, total):
 		parsear_circulating = json.loads(obtener_circulating.text); y = parsear_circulating['assets']
 
 	try:
-		reservas = 0
 		for x in y:
 			if x['asset-id'] == asa:
 				reservas = x['asset-id']
@@ -411,7 +288,7 @@ else: fichero = "last-block-reverse"
 if opt_local_node == True:
 	obtener_cblock = lsession.get('http://127.0.0.1:8080/v2/status/')
 else:
-	obtener_cblock = session.get('https://mainnet-api.algonode.cloud/v2/status')
+	obtener_cblock = session.get('https://node.algoexplorerapi.io/v2/status')
 parsear_cblock = json.loads(obtener_cblock.text); last_round = parsear_cblock['last-round']
 
 try:
@@ -419,7 +296,7 @@ try:
 		i = int(f.read())
 
 except:
-	i = 28718928 # manual block start!!
+	i = 25000000 # manual block start!!
 	pass
 
 if last_round - i < 600:
@@ -447,11 +324,8 @@ while True:
 		for x in bloque_dicc:
 			if x['tx-type'] == 'appl':
 				try:
-					if 'c3dhcA==' in x['application-transaction']['application-args']:
-						if x['application-transaction']['application-id'] == 552635992 or x['application-transaction']['application-id'] == 350338509 and x['local-state-delta'][0]['address'] not in lista_pools:
-							lista_pools.append(x['local-state-delta'][0]['address'])
-						if x['application-transaction']['application-id'] == 1002541853 and x['inner-txns'][0]['sender'] not in lista_pools:
-							lista_pools.append(x['inner-txns'][0]['sender'])
+					if 'c3dhcA==' in x['application-transaction']['application-args'] and x['application-transaction']['application-id'] == 552635992 and x['local-state-delta'][0]['address'] not in lista_pools:
+						lista_pools.append(x['local-state-delta'][0]['address'])
 					elif 'c2Vm' in x['application-transaction']['application-args'] and x['inner-txns'][0]['sender'] not in lista_pools:
 						lista_pools.append(x['inner-txns'][0]['sender'])
 					elif 'U1dBUA==' in x['application-transaction']['application-args'] and x['application-transaction']['application-id'] != 947569965 and x['inner-txns'][0]['sender'] not in lista_pools:
